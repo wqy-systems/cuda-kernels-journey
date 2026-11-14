@@ -35,8 +35,8 @@ ncu -i report.ncu-rep                                 # 在界面/终端里看
 
 ## 进度（W01-W08 · S0 地基）
 
-- [ ] W01 环境打通：`nvcc -V` + `nvidia-smi` 正常，跑通 `01_vector_add`
-- [ ] W01 建 GitHub 仓库，push 首次提交
+- [x] W01 环境打通：`nvcc -V` + `nvidia-smi` 正常，跑通 `01_vector_add`
+- [x] W01 建 GitHub 仓库，push 首次提交（commit `be4770c`）
 - [ ] W02 Linux 基础：进程 / 权限 / 环境变量 / gdb 断点
 - [ ] W02 CMake 最小工程能编译 .cu
 - [ ] W03 C++ 指针与内存：手写 3 个小程序（数组反转 / 字符串拷贝 / 动态二维数组）
@@ -50,7 +50,7 @@ ncu -i report.ncu-rep                                 # 在界面/终端里看
 
 | 周 | 主题 | 投入(h) | 卡住的地方 | 一句话收获 |
 |---|---|---|---|---|
-| W01 | | | | |
+| W01 | 环境搭建 + 第一个 kernel | 4 | GitHub：github.com 被 DNS 污染成 127.0.0.1、HTTPS 被 SNI 重置、SSH 公钥三次指纹不匹配 | vector add 只有 47.6% 带宽——每个线程每轮只搬 4 字节，并行粒度不够粗，不是 bug |
 | W02 | | | | |
 | W03 | | | | |
 | W04 | | | | |
