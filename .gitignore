@@ -1,0 +1,18 @@
+# 编译产物（与 *.cu 同名的可执行文件）
+01_vector_add/vector_add
+02_saxpy/saxpy
+
+# profiling 报告
+*.ncu-rep
+*.nsys-rep
+*.sqlite
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+
+# 临时文件
+*tmp*
+*.log
+a.out
