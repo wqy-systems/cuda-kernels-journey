@@ -1,11 +1,21 @@
-# 编译产物（与 *.cu 同名的可执行文件）
-01_vector_add/vector_add
-02_saxpy/saxpy
+# 编译产物
+# kernel 目录下只保留源码和文档，其余（可执行文件）一律忽略
+# 这样以后新增 03_xxx/ 之类的目录不用再改这里
+0*_*/*
+!0*_*/*.cu
+!0*_*/*.cpp
+!0*_*/*.md
+!0*_*/*.h
+!0*_*/*.cuh
+
+# nano 自动备份
+*.save
 
 # profiling 报告
 *.ncu-rep
 *.nsys-rep
 *.sqlite
+report*
 
 # 编辑器
 .vscode/
