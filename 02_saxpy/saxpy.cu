@@ -12,7 +12,7 @@
 
 constexpr int N = 1 << 24;          // 16,777,216 个元素，三个数组共 192MB
 constexpr int BLOCK_SIZE = 256;
-constexpr int GRID_SIZE = 216;     // 故意不铺满，逼 kernel 用 grid-stride
+constexpr int GRID_SIZE = 1024;     // 故意不铺满，逼 kernel 用 grid-stride
 
 // ---------------------------------------------------------------------------
 // kernel：和 vector_add 只差循环体那一行
@@ -62,16 +62,24 @@ int main() {
     // ---- 3. 启动 kernel ----
     dim3 block(BLOCK_SIZE);
     dim3 grid(GRID_SIZE);
+
     GpuTimer timer;
 
-    // 热身一次：把 GPU 频率拉满，结果丢弃
+    // 热身一次：把 GPU 频率从几百 MHz 拉到最高，这一次的结果直接丢弃
     saxpyKernel<<<grid, block>>>(d_x, d_y, a, N);
     CUDA_CHECK(cudaDeviceSynchronize());
 
+    // 正式测量：连跑 10 次，取最快的那次
+    // 为什么取最快而不是平均：热了之后仍有温度墙导致的抖动，最快值才代表真实上限
     float ms = 1e9f;
-    for (int rep = 0; rep < 10; ++rep) { ... }   // 保持原样
-
-
+    for (int rep = 0; rep < 10; ++rep) {
+        timer.start();
+        saxpyKernel<<<grid, block>>>(d_x, d_y, a, N);
+        float t = timer.stop();
+        printf("  第 %2d 次: %6.3f ms  →  %6.1f GB/s\n",
+               rep, t, 3.0 * N * sizeof(float) / (t * 1e6));
+        if (t < ms) ms = t;
+    }
     CUDA_CHECK(cudaGetLastError());
 
     // ---- 4. 拷回 ----
