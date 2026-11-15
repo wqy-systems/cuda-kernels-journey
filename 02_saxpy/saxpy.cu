@@ -62,18 +62,16 @@ int main() {
     // ---- 3. 启动 kernel ----
     dim3 block(BLOCK_SIZE);
     dim3 grid(GRID_SIZE);
-
     GpuTimer timer;
-    for(int i= 0;i<2;++i)
-       saxpyKernel<<<grid,block>>>(d_x,d_y,a,N);
+
+    // 热身一次：把 GPU 频率拉满，结果丢弃
+    saxpyKernel<<<grid, block>>>(d_x, d_y, a, N);
     CUDA_CHECK(cudaDeviceSynchronize());
-     float ms = 1e9f;
-    for (int rep = 0; rep < 10; ++rep) {
-        timer.start();
-        saxpyKernel<<<grid, block>>>(d_x, d_y, a, N);
-        float t = timer.stop();
-        if (t < ms) ms = t;
-    }
+
+    float ms = 1e9f;
+    for (int rep = 0; rep < 10; ++rep) { ... }   // 保持原样
+
+
     CUDA_CHECK(cudaGetLastError());
 
     // ---- 4. 拷回 ----
