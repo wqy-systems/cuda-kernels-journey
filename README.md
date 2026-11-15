@@ -23,22 +23,49 @@ cuda-kernels-journey/
 
 ## 常用命令
 
+**CMake（推荐，日常用这个）**
+
 ```bash
-make                      # 编译全部
+cmake -B build              # 配置：只有第一次，或改了 CMakeLists.txt 才需要
+cmake --build build -j      # 编译（增量，只重编改过的文件）
+./build/bin/transpose       # 运行
+rm -rf build                # 环境搞乱了就清空重来
+```
+
+**Makefile（备用，单文件编译够用）**
+
+```bash
+make                            # 编译全部
 make 01_vector_add/vector_add   # 只编一个
 ./01_vector_add/vector_add      # 运行
 bash check_env.sh               # 环境自检
-
-ncu --set full -o report ./01_vector_add/vector_add   # 出一份完整 profile
-ncu -i report.ncu-rep                                 # 在界面/终端里看
 ```
+
+**profiling**
+
+```bash
+ncu --set full -o report ./build/bin/transpose   # 出一份完整 profile
+ncu -i report.ncu-rep                            # 在界面/终端里看
+nsys profile -o timeline ./build/bin/transpose   # 看时间线
+```
+
+> CMake 的 `CMAKE_CUDA_ARCHITECTURES` 设成 89（4070 Laptop = sm_89）。换机器要改这里，否则编译巨慢或跑不起来。
+
+## 欠账清单
+
+按优先级排，别忘了：
+
+- [ ] **gdb 调试**：现在程序崩了只能靠 printf。等第一次段错误之前补上，半小时够。
+- [ ] **Linux 基础**：进程 / 权限 / 环境变量，按需查，不用专门学。
+- [ ] **内存泄漏检查**：compute-sanitizer 还没用过，写 GEMM 之前过一遍。
+- [x] ~~CMake 最小工程~~（2026-11-15 补完）
 
 ## 进度（W01-W08 · S0 地基）
 
 - [x] W01 环境打通：`nvcc -V` + `nvidia-smi` 正常，跑通 `01_vector_add`
 - [x] W01 建 GitHub 仓库，push 首次提交（commit `be4770c`）
 - [ ] W02 Linux 基础：进程 / 权限 / 环境变量 / gdb 断点
-- [ ] W02 CMake 最小工程能编译 .cu
+- [x] W02 CMake 最小工程能编译 .cu（2026-11-15，五个目标全部构建通过）
 - [ ] W03 C++ 指针与内存：手写 3 个小程序（数组反转 / 字符串拷贝 / 动态二维数组）
 - [ ] W04 C++ 类与模板：手写简化版 vector（含拷贝构造、析构、operator[]）
 - [ ] W05 CSAPP 第 3 章：汇编、内存层次、Cache 行大小实测
