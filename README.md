@@ -107,6 +107,7 @@ nsys profile -o timeline ./build/bin/transpose   # 看时间线
 | 06 分块16 | 1864 GFLOP/s | 9.3% | 1.3x |
 | 07 四路累加 | 1882 GFLOP/s | 9.4% | 1.01x（相对分块） |
 | TILE=32 | 1562 GFLOP/s | 7.8% | 反而更慢，已改回 16 |
+| **08 Tensor Core (wmma)** | **10486 GFLOP/s** | 占 TC 峰值约 10% | **5.63x**，校验 9.7e-4 PASS |
 
 **四次预测全错，这是收获**：
 1. 以为主性能掉到 1% 以下 → 实际 6%
@@ -115,6 +116,10 @@ nsys profile -o timeline ./build/bin/transpose   # 看时间线
 4. 以为 TILE 加大更好 → 反而更慢
 
 说明瓶颈不是"加法排队"也不是"共享内存读取量"。**光靠改参数已经到顶**，要再往上必须换武器：Tensor Core（专用矩阵乘硬件，算力是 FP32 的十几倍）。
+
+**Tensor Core 那一跳**：把 CUDA 核心换成 Tensor Core（wmma API），一条 `mma_sync` 指令 = 16×16×16 = 4096 次乘加，直接 5.63 倍。
+注意 `matrix_b` 必须写 `wmma::row_major`（B 在内存里按行存），写成 `col_major` 会性能正常但结果全错——**性能正常、结果错，先查布局和索引**。
+现在 10.5 TFLOPS 仍只有 Tensor Core 峰值（100+ TFLOPS）的 ~10%，因为每个 warp 各自从全局读块，没有复用。下一步：多 warp 共享块 + 双缓冲。
 
 **WSL2 限制**：`ncu --set full` 报 `ERR_NVGPUCTRPERM`，sudo 也不行——WSL2 子系统里拿不到 GPU 硬件计数器。要做 profile 得在 Windows 侧用 Nsight Compute GUI 连 WSL target，或者上真 Linux / 云主机。目前用"改参数→看数字"的实验法代替。
 

@@ -31,6 +31,10 @@ cd "$REPO" || { echo "找不到仓库目录 $REPO"; exit 1; }
   echo "===== 07 四路累加：治排队 ====="
   ./build/bin/gemm_unroll
 
+  echo
+  echo "===== 08 Tensor Core：换机器 ====="
+  ./build/bin/gemm_wmma
+
 } 2>&1 | tee "$OUT"
 
 echo
