@@ -46,7 +46,7 @@ add_executable(warmup 00_cpp_warmup/warmup.cpp)
 #
 # 注意：GLOB 是"配置时"快照，新加了文件要重新跑一次 cmake -B build 才会被发现。
 # ---------------------------------------------------------------------------
-file(GLOB KERNEL_SOURCES "0*_*/*.cu")
+file(GLOB KERNEL_SOURCES "[0-9][0-9]_*/*.cu")
 
 foreach(src IN LISTS KERNEL_SOURCES)
     get_filename_component(kernel_name ${src} NAME_WE)   # 去掉路径和扩展名
