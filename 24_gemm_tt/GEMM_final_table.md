@@ -86,3 +86,12 @@ nvcc -O3 -Iinclude -Xptxas -v -o 24_gemm_tt/gemm_bench 24_gemm_tt/gemm_bench.cu
 ```
 
 注意：`gemm_cpasync.cu` 必须加 `-arch=sm_89` 才能编译（cp.async 是 sm_80 之后的指令），所以它的数字不能和上表直接比较。
+
+## 公开记录
+
+本文数据整理成文发表于：
+
+- 知乎：https://zhuanlan.zhihu.com/p/2108300534721557012
+- 掘金：https://juejin.cn/post/7711248788611121161
+
+发布时间：2026-11-23

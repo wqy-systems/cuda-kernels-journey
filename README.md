@@ -1,148 +1,128 @@
-# CUDA Kernels Journey
+# cuda-kernels-journey
 
-从零手写 GPU kernel 的学习仓库。目标岗位：AI 系统 / 算子工程师。  
-起点：2026-11-16（大二上）｜终点：2028-09 秋招。
+从零学 CUDA 算子的实验记录。每个目录一个 kernel，每个 kernel 都有实测数据和失败记录。
 
-## 设备
+目标岗位：AI 系统 / 算子工程师（CUDA 算子、NCCL/RDMA 通信、MLIR/Triton 编译栈）。
+计划：96 周，2028 年 9 月秋招。
 
-- RTX 4070 Laptop GPU，**8GB 显存**，sm_89，driver 621.24
-- 编译环境：WSL2 + Ubuntu 22.04 + CUDA 12.x
-- 注意：8G 显存 → GEMM 用 4096³ 以内，FlashAttention 用 seq_len ≤ 2048 / head_dim 64
+## 当前进度
 
-## 目录约定
+| 阶段 | 内容 | 状态 |
+|---|---|---|
+| S0 地基 | Linux、C++、计算机组成、线性代数、工具链 | 完成 |
+| S1 CUDA 入门 | 六个基础 kernel + ncu 瓶颈判定 | 完成 |
+| S2 性能优化 | SGEMM 九版本，10311 GFLOP/s（峰值 52%） | 完成 |
+| S3 算子库 | CUTLASS / FlashAttention / Triton | 进行中 |
 
-```
-cuda-kernels-journey/
-├── Makefile            编译规则（自动识别子目录下的 .cu）
-├── check_env.sh        环境自检
-├── include/common.h    计时 / 校验 / 错误检查工具
-├── 01_vector_add/      第 1 个 kernel（参考实现，逐行有注释）
-├── 02_saxpy/           第 2 个 kernel（自己写，看同目录 README）
-└── notes/              每周笔记（每周至少一条）
-```
+## 成果
 
-## 常用命令
+**SGEMM 优化：从算力峰值 6% 到 52%**
 
-**CMake（推荐，日常用这个）**
+矩阵 2048×2048，单精度，RTX 4070 Laptop（36 SM，8GB，256 GB/s）：
 
-```bash
-cmake -B build              # 配置：只有第一次，或改了 CMakeLists.txt 才需要
-cmake --build build -j      # 编译（增量，只重编改过的文件）
-./build/bin/transpose       # 运行
-rm -rf build                # 环境搞乱了就清空重来
-```
-
-**Makefile（备用，单文件编译够用）**
-
-```bash
-make                            # 编译全部
-make 01_vector_add/vector_add   # 只编一个
-./01_vector_add/vector_add      # 运行
-bash check_env.sh               # 环境自检
-```
-
-**profiling**
-
-```bash
-ncu --set full -o report ./build/bin/transpose   # 出一份完整 profile
-ncu -i report.ncu-rep                            # 在界面/终端里看
-nsys profile -o timeline ./build/bin/transpose   # 看时间线
-```
-
-> CMake 的 `CMAKE_CUDA_ARCHITECTURES` 设成 89（4070 Laptop = sm_89）。换机器要改这里，否则编译巨慢或跑不起来。
-
-## 欠账清单
-
-按优先级排，别忘了：
-
-- [ ] **gdb 调试**：现在程序崩了只能靠 printf。等第一次段错误之前补上，半小时够。
-- [ ] **Linux 基础**：进程 / 权限 / 环境变量，按需查，不用专门学。
-- [ ] **内存泄漏检查**：compute-sanitizer 还没用过，写 GEMM 之前过一遍。
-- [x] ~~CMake 最小工程~~（2026-11-15 补完）
-
-## 进度（W01-W08 · S0 地基）
-
-- [x] W01 环境打通：`nvcc -V` + `nvidia-smi` 正常，跑通 `01_vector_add`
-- [x] W01 建 GitHub 仓库，push 首次提交（commit `be4770c`）
-- [ ] W02 Linux 基础：进程 / 权限 / 环境变量 / gdb 断点
-- [x] W02 CMake 最小工程能编译 .cu（2026-11-15，五个目标全部构建通过）
-- [ ] W03 C++ 指针与内存：手写 3 个小程序（数组反转 / 字符串拷贝 / 动态二维数组）
-- [ ] W04 C++ 类与模板：手写简化版 vector（含拷贝构造、析构、operator[]）
-- [ ] W05 CSAPP 第 3 章：汇编、内存层次、Cache 行大小实测
-- [ ] W06 CSAPP 第 5-6 章：性能优化、SIMD
-- [ ] W07 写 `02_saxpy`，用 ncu 看第一个 kernel 的指标
-- [ ] W08 期末周：只保持每天 30 分钟，不掉线
-
-## 性能基线
-
-测量方法：先空跑 2 次热身，再连续跑 10 次取最快那一次（笔记本 GPU 空闲会降频，单次测量不可信）。
-
-| kernel              | 带宽         | 占理论峰值 | 备注                   |
-| ------------------- | ---------- | ----- | -------------------- |
-| 公式算的理论峰值 | 256 GB/s | 100% | **低估了，别当基准用** |
-| 实测最好成绩 | **262.7 GB/s** | — | reduce v3，目前最高 |
-| 01 vector add       | ~240 GB/s  | 94%   | 纯流式，已到极限             |
-| 02 saxpy            | ~240 GB/s  | 94%   | 同上，无优化空间             |
-| 03 transpose 朴素 | ~118 GB/s | 46% | 散写，浪费一半带宽 |
-| 03 transpose 分块 | ~243 GB/s | 95% | 共享内存中转，1.8–2.1 倍提速 |
-| 04 reduce 原子加 | 219 GB/s | 85.6% | 52 万次原子排队，被带宽掩盖 |
-| 04 reduce 树形 | 261 GB/s | 102% | 每个 block 只原子加一次 |
-| 04 reduce shuffle | 262.7 GB/s | 102.6% | 寄存器交换，免共享内存 |
-| H2D 拷贝              | ~12.3 GB/s | —     | PCIe 4.0 x8 + WSL 开销 |
-
-**结论**
-- 纯 streaming 和归约类 kernel 在这块卡上 ~95% 就是天花板，再优化也就 5% 的空间。
-- **理论峰值公式（2×频率×位宽÷8）算出的 256 GB/s 偏低**，实测至少 263 GB/s。判断"离极限还有多远"要用实测最好成绩当分母。
-- 真正值得优化的是 GEMM——它有数据复用、能吃满算力，跟这些带宽受限的 kernel 完全不是一类问题。
-
-**浮点精度提醒**：reduce v1（原子加）相对误差 -4.3e-12，比树形归约的 -1e-15 大 4000 倍，而且每次运行结果都不一样——原子加的顺序不确定，不可复现。浮点加法不满足结合律，后面做 GEMM 精度对齐会反复遇到。
-
-## GEMM 实验记录（2026-11-16）
-
-算力峰值 **20.0 TFLOPS**（36 SM × 128 核 × 2 × 2.17 GHz），平衡点 78.3 FLOP/byte。
-
-| 版本 | 1024³ | 占算力峰值 | 提速 |
+| 版本 | GFLOP/s | 相对分块版 | 手法 |
 |---|---|---|---|
-| 05 朴素 | 1219 GFLOP/s | 6.1% | — |
-| 06 分块16 | 1864 GFLOP/s | 9.3% | 1.3x |
-| 07 四路累加 | 1882 GFLOP/s | 9.4% | 1.01x（相对分块） |
-| TILE=32 | 1562 GFLOP/s | 7.8% | 反而更慢，已改回 16 |
-| **08 Tensor Core (wmma)** | **10486 GFLOP/s** | 占 TC 峰值约 10% | **5.63x**，校验 9.7e-4 PASS |
+| v2_tiled16 | 1593.7 | 1.00x | 共享内存分块，一输出一线程 |
+| v3_tt4 | 7729.2 | 4.85x | 4×4 线程分块 |
+| v4_tt4v | 8085.4 | 5.07x | + float4 访存 |
+| v5_tt4v_lb4 | 8692.9 | 5.45x | + 占用率 67% |
+| v6_tt8v | 7854.8 | 4.93x | 8×8（失败） |
+| **v7_db** | **10311.7** | **6.47x** | + 双缓冲 |
+| v8_db_lb4 | 9636.5 | 6.05x | 双缓冲 + 强制 4 块 |
 
-**四次预测全错，这是收获**：
-1. 以为主性能掉到 1% 以下 → 实际 6%
-2. 以为分块快 5–20 倍 → 实际 1.3 倍
-3. 以为四路累加快 2–4 倍 → 实际 1.01 倍
-4. 以为 TILE 加大更好 → 反而更慢
+完整数据和每条结论见 [`24_gemm_tt/GEMM_final_table.md`](24_gemm_tt/GEMM_final_table.md)。
 
-说明瓶颈不是"加法排队"也不是"共享内存读取量"。**光靠改参数已经到顶**，要再往上必须换武器：Tensor Core（专用矩阵乘硬件，算力是 FP32 的十几倍）。
+**文章**
 
-**Tensor Core 那一跳**：把 CUDA 核心换成 Tensor Core（wmma API），一条 `mma_sync` 指令 = 16×16×16 = 4096 次乘加，直接 5.63 倍。
-注意 `matrix_b` 必须写 `wmma::row_major`（B 在内存里按行存），写成 `col_major` 会性能正常但结果全错——**性能正常、结果错，先查布局和索引**。
-现在 10.5 TFLOPS 仍只有 Tensor Core 峰值（100+ TFLOPS）的 ~10%，因为每个 warp 各自从全局读块，没有复用。下一步：多 warp 共享块 + 双缓冲。
+- 知乎：[把 SGEMM 从 6% 跑到 52%：九个版本的实验记录](https://zhuanlan.zhihu.com/p/2108300534721557012)
+- 掘金：[同名文章](https://juejin.cn/post/7711248788611121161)
 
-**WSL2 限制**：`ncu --set full` 报 `ERR_NVGPUCTRPERM`，sudo 也不行——WSL2 子系统里拿不到 GPU 硬件计数器。要做 profile 得在 Windows 侧用 Nsight Compute GUI 连 WSL target，或者上真 Linux / 云主机。目前用"改参数→看数字"的实验法代替。
+## 目录
 
-## 踩坑记录
+### 基础 kernel
 
-- **VSCode 显示旧内容**：从 Windows 侧改写 WSL 里的文件时，WSL 的文件监听可能不触发，VSCode 会一直显示旧缓存。判断方法看文件大小/修改时间，或在 VSCode 里 `Ctrl+Shift+P` → `File: Revert File`。**缓存是旧的时候千万别按 Ctrl+S**，会把磁盘上的新内容覆盖掉。
-- **单次测性能不可信**：同一份代码三次能差 15%–60%，因为笔记本 GPU 空闲时频率会降到几百 MHz。必须热身 + 多次取最快。
-- **nano 会留 `.save` 备份**：编辑过的文件旁边会多个 `xxx.save`，容易看错文件，用完删掉。
+| 目录 | 内容 | 最好成绩 |
+|---|---|---|
+| `01_vector_add` | 向量加法，理解 grid-stride loop 与合并访问 | 240 GB/s（94% 峰值） |
+| `02_saxpy` | 原地修改、const、可信的测量方法 | 240 GB/s |
+| `03_transpose` | 共享内存分块 + `tile[32][33]` 消除 bank conflict | 243 GB/s，1.8–2.1x |
+| `04_reduce` | 树形归约、warp shuffle、原子操作与浮点精度 | 262.7 GB/s |
+| `22_conv1d` | 一维卷积，验证 L1 缓存兜住邻域复用 | 226 GB/s（理想流量 88%） |
+| `23_softmax` | 三趟扫描的 softmax，online 最大值的起点 | 228 GB/s |
 
-## 每周记录
+### GEMM 优化路径
 
-| 周   | 主题                | 投入(h) | 卡住的地方                                                              | 一句话收获                                                |
-| --- | ----------------- | ----- | ------------------------------------------------------------------ | ---------------------------------------------------- |
-| W01 | 环境搭建 + 第一个 kernel | 4     | GitHub：github.com 被 DNS 污染成 127.0.0.1、HTTPS 被 SNI 重置、SSH 公钥三次指纹不匹配 | vector add 只有 47.6% 带宽——每个线程每轮只搬 4 字节，并行粒度不够粗，不是 bug |
-| W02 |                   |       |                                                                    |                                                      |
-| W03 |                   |       |                                                                    |                                                      |
-| W04 |                   |       |                                                                    |                                                      |
-| W05 |                   |       |                                                                    |                                                      |
-| W06 |                   |       |                                                                    |                                                      |
-| W07 |                   |       |                                                                    |                                                      |
-| W08 |                   |       |                                                                    |                                                      |
+| 目录 | 内容 |
+|---|---|
+| `05_gemm` | 朴素版，算术强度 0.25，撞上内存墙 |
+| `06_gemm_tiled` | 共享内存分块 TILE=16，只涨 1.3 倍 |
+| `07_gemm_unroll` | 四路累加，证明瓶颈不在加法依赖链 |
+| `08_gemm_wmma` | Tensor Core，一条指令 4096 次乘加，5.63x |
+| `24_gemm_tt` | 线程分块到双缓冲的完整擂台，九版本对比 |
 
-## 一条硬规矩
+### 自己独立写的 kernel
 
-每周至少一次 commit，哪怕只改了笔记。  
-仓库的绿色格子连续不断，本身就是能力证明；面试官真的会点进来看提交记录。
+`09_my_first_kernel`、`10_my_saxpy`、`12_my_reduce` —— 这三个是遮住答案自己敲的，不是抄的。
+
+### C++ 与工具链
+
+| 目录 | 内容 |
+|---|---|
+| `00_cpp_warmup` | C++ 最小集：指针、数组、函数、const、循环 |
+| `11_gdb_practice` | gdb 调试两个崩溃程序 |
+| `13_pointer_gdb` | 指针与内存布局 |
+| `14_const_ref` | const 与引用的组合 |
+| `15_my_class` | 类的构造、析构、成员函数 |
+| `16_my_template` | 函数模板与类模板 |
+| `17_cache` | 亲手测出 cache line 大小与组相联 |
+| `18_pipeline` | 亲手测出流水线与分支预测的 4 倍差 |
+| `19_raii` | RAII：设备内存封装、异常安全、移动语义、显存池 |
+| `20_stl` | vector 扩容、指针失效、reserve、benchmark 工具 |
+| `21_compile` | 编译链接：`.i` / `.s` / `.o`、符号表、静态库与动态库 |
+
+## 环境
+
+| 项 | 值 |
+|---|---|
+| GPU | RTX 4070 Laptop，CC 8.9，36 SM，8GB |
+| 主开发 | WSL2 · Ubuntu 22.04 · CUDA 12.6 |
+| 真机 | Ubuntu 26.04.1 · CUDA 13.5.37 · ncu 2026.4.0.0 |
+| 编译 | nvcc + CMake + Ninja |
+
+ncu 只能在真机跑，WSL2 报 `ERR_NVGPUCTRPERM`。
+
+## 怎么跑
+
+```bash
+# 全部编译
+make
+
+# 单个
+make 01_vector_add/vector_add
+./01_vector_add/vector_add
+
+# CMake 构建
+cmake -B build -DCMAKE_CUDA_ARCHITECTURES=89
+cmake --build build -j
+
+# GEMM 擂台（九版本对比）
+nvcc -O3 -Iinclude -Xptxas -v -o 24_gemm_tt/gemm_bench 24_gemm_tt/gemm_bench.cu
+./24_gemm_tt/gemm_bench
+
+# cp.async 版本必须指定架构
+nvcc -O3 -arch=sm_89 -Iinclude -o 24_gemm_tt/gemm_cpasync 24_gemm_tt/gemm_cpasync.cu
+```
+
+## 三条带得走的结论
+
+**一，性能账按「显存被碰了几次」记，不按「代码里读了几次」记。** 一维卷积纸面算出 1130 GB/s，超过峰值四倍，原因是那些重复读全被 L1 接住了。
+
+**二，双缓冲省的是 `__syncthreads()` 的停顿，不是带宽。** DRAM 吞吐只占 2.76% 的时候，双缓冲仍然涨了 18.6%。
+
+**三，编译参数的影响大于后期优化。** 同一个 kernel，加 `-arch=sm_89` 后慢 8%，而 v4 之后的每一步优化收益只有 3%–19%。
+
+## 还没做的
+
+- `04_reduce` 缺 unroll 与 warp shuffle 两版
+- compute-sanitizer 查内存越界
+- S3 的 CUTLASS / FlashAttention
